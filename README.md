@@ -1,8 +1,7 @@
 # 📖 About
 
-This repository focuses on data analysis using different statistical methodologies applied to a public dataset from a Portuguese banking institution's marketing campaign. **Generalized Linear Model (GLM)** have been implemented, in particular the **Multivariate Logistic Regression**.
-
-The main objective is to provide an in-depth understanding of the differences in philosophy, methodology, and results between the Frequentist and Bayesian approaches, adhering to proper statistical assumptions to ensure the right interpretation of results.
+This repository focuses on data analysis using **Generalized Linear Model (GLM)**, in particular the **Multivariate Logistic Regression** applied to a public dataset from a Portuguese banking institution's marketing campaign.
+The aim is to provide an in-depth understanding of the differences in philosophy, methodology, and results between the Frequentist and Bayesian approaches, adhering to proper statistical assumptions to ensure the right interpretation of results.
 
 
 ## Pipeline of the Project:
@@ -17,12 +16,19 @@ The main objective is to provide an in-depth understanding of the differences in
 ## 📊 Dataset
 [Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) has been used, in particular 'bank.csv' file insted of 'bank_full.csv' for computational reasons.
 
-# 📈 Results
+## 📈 Results
 
-The two models are fitted with a subset of variables obtained from a *Bayesian Feature Selection using Latent Variables* omitted the correleated variables.
+Using the *Covariance Matrix* to eliminate correleated varaibles and *Bayesian Feature Selection using Latent Variables* to to identify the most influential predictors, the model is fitted on a subset that consider: 
 
+ - `housing | Yes`
+ - `loan | Yes`
+ - `campaign`
+ - `previous`
 
+| Covariance Matrix | Bayesian Feature Selection |
+|---------|---------|
+| ![Image 1](images/covariance.png) | ![Image 2](images/selection.png) |
 
-From the predictive perspective the model suffer of unbalanced label issue, leading to poor performance w.r.t. our minority class witch is the information of interest. Several techniques could be implemented but are not the focus of this analysis.
+The model is then fitted to the data using both approaches to obtain the estimates. However data suffers from an issue of unbalanced labels, thus from a predictive perspective, the model result in poor performance concerning the minority class, which is the information of primary interest. This problem could be solved with more advanced techniques.
 
 # 💡 Conclusion
