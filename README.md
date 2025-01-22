@@ -1,6 +1,6 @@
 # 📖 About
 
-This repository focuses on data analysis using different statistical methodologies applied to a public dataset from a Portuguese banking institution's marketing campaign. **Generalized Linear Model (GLM)** have been implemented, in particular the ** Multivariate Logistic Regression**.
+This repository focuses on data analysis using different statistical methodologies applied to a public dataset from a Portuguese banking institution's marketing campaign. **Generalized Linear Model (GLM)** have been implemented, in particular the **Multivariate Logistic Regression**.
 
 The main objective is to provide an in-depth understanding of the differences in philosophy, methodology, and results between the Frequentist and Bayesian approaches, adhering to proper statistical assumptions to ensure the right interpretation of results.
 
@@ -19,7 +19,9 @@ The main objective is to provide an in-depth understanding of the differences in
 
 # 📈 Results
 
-The two models are fitted with a subset of variables obtained from a *Bayesian Feature Selection using Latent Variables*. 
+The two models are fitted with a subset of variables obtained from a *Bayesian Feature Selection using Latent Variables* omitted the correleated variables.
+
+
 
 From the predictive perspective the model suffer of unbalanced label issue, leading to poor performance w.r.t. our minority class witch is the information of interest. Several techniques could be implemented but are not the focus of this analysis.
 
