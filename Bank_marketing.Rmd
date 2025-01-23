@@ -1,0 +1,719 @@
+---
+title: "Statistical Insights into Bank Marketing: Bayesian vs. Frequentist Approaches  "
+author: "Andrea Sciortino"
+date: "2025-01-09"
+output: pdf_document
+---
+
+# Bank Phone Marketing Campaign Analysis
+
+## Introduction and Data Exploration
+
+This document aims to provide a clear and comprehensive implementation of two distinct statistical approaches, both developed from scratch: the frequentist and the bayesian frameworks. The primary objective is to interpret the results to better understand the philosophical and methodological differences between these two statistical paradigms to analyse the regression coefficient, with necessary distinction and comparison, highlighting some key statistical strength of the Bayesian approach.
+
+The data-set is from a Portuguese banking institution, sourced from the UCI Machine Learning Repository, to analyze direct marketing campaigns promoting term deposits. The goal is to build a classification with a multiple logistic regression model, to infer the client subscription decisions. The data-set collected 4,521 observations, their outputs of the call (subscribe a deposit or none) and 16 features for each consumer like:
+
+> -   duration of the call,
+>
+> -   preexisting house loan? Yes\|No
+>
+> -   date of the campaign
+>
+> -   balance of the customer
+>
+> -   number of previous call etc.
+
+`duration` has been immediately discarded as non-informative (*further information at data description on UCI*) and used `bank.cvs` instead of `bank_all.cvs` for computational reasons.
+
+```{r}
+# Read data and encoding of the responce
+bank_raw = read.csv("bank.csv", sep = ";")
+bank_raw$y = ifelse(bank_raw$y == "yes", 1, 0)
+
+# Check unbalanced
+table(bank_raw$y)
+```
+
+The data may suffer from an issue of unbalanced response variable, causing the model to favor predicting the majority class (i.e., `0`) over the minority class (i.e., positive subscriptions `1`). However, this issue is not investigated, as the aim of this project is not to achieve the best predictions, but rather to focus more on *implementation* and *interpretation* of the approaches.
+
+# Features selection
+
+The aim of this phase is select a subset of the features, possibly the best, to fit the model. Different approaches can be implemented in this phase:
+
+> -   Covariance Matrix
+>
+> -   Bayesian Feature Selection via Latent Variables Gamma
+
+**Covariance matrix** is the first tool to discard eventual linearly correlated continousfeatures in order to omit them.
+
+```{r echo=FALSE}
+library(reshape2)
+
+bank_VS = bank_raw[, !names(bank_raw) %in% c('duration','month', 'job', 'education', 'marital', 'poutcome', 'contact', 'loan', 'housing', 'default')]
+
+X.tmp = model.matrix(y ~., bank_VS)  # Create model matrix
+y = bank_VS$y  # Response variable
+X_t = as.data.frame(X.tmp)  # Convert to data frame
+X = scale(X_t[, -1])  # Standardize all predictor columns (excluding intercept)
+
+
+cov_matrix = cov(X)
+cov_df = melt(cov_matrix)
+
+# Plot the covariance matrix with ggplot2
+library(ggplot2)
+ggplot(cov_df, aes(Var1, Var2, fill = value)) +
+  geom_tile() +
+  scale_fill_gradient2(low = "blue", high = "brown3", mid = "white", midpoint = 0) +
+  theme_minimal() +
+  labs(title = "Covariance Matrix", x = "Predictor", y = "Predictor") + 
+  coord_flip() + 
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+```
+
+**Bayesian Feature Selection using Latent Variables**, specifically the Gamma procedure, is thoroughly detailed in the *'Bank_Cassola_Sciortino.pdf'* . This approach identifies the features with the highest probabilities of inclusion across the entire model space.
+
+```{r echo=FALSE}
+
+bank_VS = bank_raw[, !names(bank_raw) %in% c('duration', 'education', 'month', 'job', 'marital', 'poutcome', 'pdays')]
+
+X.tmp = model.matrix(y ~., bank_VS)  
+y = bank_VS$y  
+X_t = as.data.frame(X.tmp)   
+X = scale(X_t[, -1])
+```
+
+```{r echo=FALSE}
+library(R2jags)
+
+## Run the MCMC
+
+set.seed(1)
+
+jags_data = with(bank_VS, list(y = y, X = X, n = length(y), p = ncol(X)))
+
+AAA_jags_data = jags_data
+
+
+# Starrting from the likelihood = data, when i consider a new variable, latent 
+# in order to simulate from each model selected randomdly (0,0,0,1,1,1,0) for 5000
+# times I obtain the number of time where the parameter is included in the model.
+
+## [ 1.1 ] define sampling model
+
+logistic_regr_jags = function(){
+  
+  # Likelihood:
+  
+  for(i in 1:n){
+    y[i] ~ dbern(pi[i])
+    logit(pi[i]) = (gamma*beta)%*%X[i,]
+  }
+  
+  # Priors:
+  
+  for(j in 1:p){
+    beta[j] ~ dnorm(0, 0.01)
+  }
+  
+  for(j in 1:p){
+    gamma[j] ~ dbern(w)
+  }
+  
+  w ~ dbeta(1, 1)
+  
+}
+
+## [ 1.2 ] set initial value
+
+init_values = function(){
+  list(beta = rep(0, jags_data$p), gamma = rep(1, jags_data$p))
+}
+
+## [ 1.3 ] define parameters
+
+params = c("beta", "gamma")
+
+
+################################################################################
+jags_posterior = jags(data = jags_data,
+                      inits = init_values,
+                      parameters.to.save = params,
+                      model.file = logistic_regr_jags,
+                      n.chains = 1,
+                      n.iter = 5000,
+                      n.burnin = 1000,
+                      n.thin = 1)
+################################################################################
+
+out = jags_posterior$BUGSoutput
+
+beta_post  = out$sims.list$beta
+gamma_post = out$sims.list$gamma
+
+head(gamma_post)
+dim(gamma_post)
+
+S = nrow(gamma_post)
+
+## Estimate the posterior probability of inclusion of each predictor Xj
+## i.e. proportion of times gammaj = 1
+prob_inclusion = colMeans(gamma_post)
+
+
+names(prob_inclusion) = c("Age",
+                          "Default | Yes",
+                          "Balance",
+                          "Housing Loan | Yes",
+                          "Loan | Yes",
+                          "Contact | Telephone",
+                          "Contact | Unknown",
+                          "Day",
+                          "Campaing",
+                          "Previous")
+
+bar_positions <- barplot(
+  prob_inclusion,
+  col = "brown3",
+  ylab = expression(hat(p)[j]),
+  main = "Feature selection",
+  space = 0.4,
+  names.arg = '', # Suppress the default x-axis labels
+  cex.names = 0.8 # Adjust size of axis labels if needed
+)
+
+# Rotate x-axis labels
+par(xpd = TRUE)  # Allow text outside the plot region
+text(
+  x = bar_positions,              # Use the positions returned by barplot()
+  y = -0.02,                      # Slightly below the bars
+  labels = names(prob_inclusion), # Labels from your data
+  srt = 45,                       # Rotate labels 45 degrees
+  adj = 1,                        # Adjust alignment
+  cex = 0.8                       # Font size of labels
+)
+```
+
+`contact` has been omitted since 'unknown' contact is an irrelevant information at the moment.
+
+> Complex models leads to higher time complexity for this algorithms, consider that the bayesian approach take almost 10,000 simulations of each parameter, in more complex scenario some adjustments are needed. Secondly more difficult interpretation, making it challenging for users to understand how predictions are made and which features are influential.
+
+## Regression Analysis: Model Fitting and Performance Evaluation
+
+Regression analysis examines the relationship between a quantitative response variable, $Y$ , and one or more explanatory variables, $X_1 ; . . . ; X_k$, traces the conditional distribution of $Y$ as a function of the $X$. Model are before trained on data, and tested with unseen data, in order to evaluate some over-fitting or generalization issue.
+
+Our model is defined as:
+
+$$
+Y_i = \eta(\beta_0 + \beta_1X_1 + ... + \beta_4X_4 + \epsilon_i)
+$$
+
+We start defining the model:
+
+> -   Y or labels, is a binary vector (random component)
+>
+> -   X or features, is a 4069 x 5 matrix (intercept, 2 categorical and 2 quantitative)
+>
+> -   link function $\eta$ : logit function
+
+We proceed dividing the data-set in `train` and `test`:
+
+```{r echo=FALSE}
+
+bank_new = bank_VS[, !names(bank_VS) %in% c('contact', 'age', 'default', 'balance', 'day')]
+
+sample_index = sample(1:nrow(bank_new), size = 0.1 * nrow(bank_new))
+test = bank_new[sample_index, ]
+train = bank_new[-sample_index, ]
+```
+
+```{r echo=FALSE}
+# Check
+dim_test = dim(test)
+dim_train = dim(train)
+dimension_input <- data.frame(
+  Dataset = c("Test", "Train"),
+  Rows = c(dim_test[1], dim_train[1]),
+  Columns = c(dim_test[2], dim_train[2])
+)
+
+dimension_input
+```
+
+and fit the frequentist logistic regression model:
+
+```{r}
+# Fit the logistic regression model
+glm_model = glm(y ~ ., family = binomial(), data = train)
+
+# Summarize the models
+summary(glm_model)
+```
+
+In the context of statistical modeling, the Bayesian approach to regression offers a robust framework for incorporating prior beliefs about model parameters and updating these beliefs with observed data. This method allows for the estimation of posterior distributions, providing a comprehensive understanding of parameter uncertainty.
+
+Mathematically, the Bayesian approach to regression is based on **Bayes' Theorem**, which is expressed as:
+
+$$
+P(\theta | y) = \frac{P(y | \theta) P(\theta)}{P(y)}
+$$ 
+The posterior distribution of the coefficients $\beta$ is then derived as:
+
+$$
+P(\beta | X, y) \propto P(y | X, \beta) P(\beta)
+$$
+
+Where:
+
+\- $P(\beta | X, y)$ is the posterior distribution of the regression parameters given the data
+
+\- $P(y | X, \beta)$ is the likelihood function of the data given the parameters
+
+\- $P(\beta)$ is the prior distribution of the parameters
+
+In practice, sampling methods like **Markov Chain Monte Carlo (MCMC)** and **Metropolis-Hastings Algorithm** are used to approximate the posterior distribution of the parameters when it's difficult to compute directly. For the specific problem we need to implement a **Multivariate Normal Logistic Regression** model, fit the data and obtain the posterior distribution of the parameters $\beta_i = [ \beta_0, ..., \beta_4]^T$ choosing a non-informative prior distribution.
+
+$$
+P(y = 1 | \mathbf{X}) = \frac{1}{1 + \exp(-\mathbf{X} \beta_i)}
+$$
+
+Note: *all technicalities about feature selection, convergence diagnostics of the MCMC and comparison between different link function, that are better analyzed in my project for the course of Bayesian Modelling at Univeristà Cattolica del Sacro Cuore; developed on the same data and with the precious help of my colleague Vittoria Cassola, are stored in this repository on GitHub as* `Bank_Project_Sciortino_Cassola.pdf`.
+
+```{r}
+## Predictions
+# Predict probabilities for the test dataset
+test_predictions = predict(glm_model, newdata = test, type = "response")
+
+# Convert probabilities to binary classes (0 or 1)
+predicted_classes_freq = ifelse(test_predictions > 0.35, 1, 0)
+```
+
+```{r include=FALSE}
+# Generalized Linear Model inputs - TRAIN
+X.tmp.new = model.matrix(y ~., train)
+y = train$y
+X_t = as.data.frame(train)
+X_t = model.matrix(y ~., X_t)
+p = ncol(X_t)
+X = X_t
+
+# Standardization of training data
+for(j in 2:p){
+  X[,j] = (X.tmp.new[,j] - mean(X.tmp.new[,j]))/sd(X.tmp.new[,j])
+}
+
+# TEST
+
+X.tmp.test <- model.matrix(y ~ ., data = test)
+y_sampled.test <- test$y
+p <- ncol(X.tmp.test)
+X_t.test <- as.data.frame(test)
+X_t.test <- model.matrix(y ~ ., X_t.test)
+X.test <- X_t.test
+
+# Standardization of test data
+for (j in 2:p) {
+  X.test[, j] <- (X.tmp.test[, j] - mean(X.tmp.test[, j])) / sd(X.tmp.test[, j])
+}
+
+```
+
+```{r include=FALSE}
+
+#########################
+#### Helper Funtions ####
+#########################
+
+# Logarithm of the likelihood function
+log.like.eval = function(y, X, beta){
+  
+  h_eta = exp(X %*%beta)/(1 + exp(X%*%beta))
+  
+  log.like = sum(y*log(h_eta) + (1-y)*log(1 - h_eta))
+  return(log.like)
+}
+# Draws from the proposal of betaj 
+propose.beta.j = function(m.j, s2.j){
+  rnorm(1, m.j, sqrt(s2.j)) # mean of the previous beta's for the mean of the proposal
+}
+# Evaluate the log-proposal
+log.proposal.eval = function(beta.j, m.j, s2.j){
+  dnorm(beta.j, m.j, sqrt(s2.j), log = TRUE)
+}
+# Evaluate the log-prior
+log.prior.eval = function(beta.j, beta.0j, s2.0j){
+  dnorm(beta.j, beta.0j, sqrt(s2.0j), log = TRUE)
+}
+```
+
+```{r echo=TRUE}
+
+# Bayesian Logistic Regression Model
+# we define the algorithm to compute the posterior distribution of the parameters
+
+logistic_regr = function(y, X, beta.0, s2.0, S){
+  ## out : (S,p) matrix collecting S draws from the posterior of beta = (beta1,...,betap)
+  n = nrow(X)
+  p = ncol(X)
+  
+  # IMPORTANT:
+  beta_post = matrix(NA, S, p) # inizialize beta_posterior vector
+  
+  ## Set initial values (MLE estimates)
+  beta = glm(y ~ X - 1, family = binomial(link = logit))$coefficients
+  
+  # first row is the initial value (B^T)
+  beta_post[1,] = beta 
+  
+  ###
+  ### [Metropolis Hastings scheme sampler]
+  ###
+  
+  for(s in 1:S){
+    
+    for(j in 1:p){
+      
+      ## Current value of betaj is:
+      
+      betaj = beta[j]
+      
+      ## 1. Propose betaj ##
+      
+      m.j  = mean(beta_post[1:s,j], na.rm = T) # mean of all betaj values up to iteration s
+      s2.j = var(beta_post[1:s,j], na.rm = T)  # variance of all betaj values up to iteration s
+      
+      if(is.na(s2.j) | s2.j == 0){s2.j = 1}
+      
+      # obs: at the beginning, e.g. s = 1, s2.j can be 0 or NA! In that case, I set s2.j = 1
+      
+      betaj.star = propose.beta.j(m.j = m.j, s2.j = s2.j)
+      
+      # I create an auxiliary vector beta.star.tmp with all components equal to the current value of 
+      # beta except for betaj.star
+      # This is needed for likelihood evaluation
+      beta.star.tmp = beta
+      beta.star.tmp[j] = betaj.star
+      
+      ## 2. Compute rj ##
+      
+      rj = log.like.eval(y, X, beta.star.tmp) - log.like.eval(y, X, beta) +
+             log.prior.eval(betaj.star, beta.0[j], s2.0[j]) -
+        log.prior.eval(betaj, beta.0[j], s2.0[j]) +
+               log.proposal.eval(m.j, betaj.star, s2.j) - log.proposal.eval(betaj.star, m.j, s2.j)
+      
+      ## 3. Accept/reject betaj.star ##
+      
+      log.u = log(runif(1))
+      
+      if(log.u < rj){betaj = betaj.star}
+      
+      beta[j] = betaj
+      
+    }
+    
+    ## Store sampled draws ##
+    
+    beta_post[s,] = beta
+    
+  }
+  return(posterior = list(beta_post = beta_post))
+}
+
+```
+
+Now we run the algorithm for the bayesian approach to compute the posterior distribution of the parameters:
+
+```{r}
+# Initializate inputs
+n = nrow(X)
+p = ncol(X) 
+beta.0 = rep(0, p)
+s2.0   = rep(100, p)
+
+## Run the MCMC
+set.seed(24)
+
+S = 7000
+out_logistic = logistic_regr(y, X, beta.0, s2.0, S = S)
+```
+
+```{r echo=FALSE}
+beta.post_sample.new = out_logistic$beta_post
+
+colnames(X)[1] = "(Intercept)" 
+colnames(X)[2] = "housing|yes"
+colnames(X)[3] = "loan|yes"
+colnames(X)[4] = "campaign"
+colnames(X)[5] = "previous"
+colnames(beta.post_sample.new) = colnames(X)
+
+means <- colMeans(beta.post_sample.new)
+quantiles <- apply(beta.post_sample.new, 2, function(x) quantile(x, c(0.025, 0.975)))
+sd <- apply(beta.post_sample.new, 2, function(x) sd(x))
+
+mean.frame <- data.frame(
+  Mean = round(means, 2),
+  Q2.5 = round(quantiles[1, ], 3),
+  Q97.5 = round(quantiles[2, ], 3)
+)
+
+
+cat("Summary Statistics of Posterior Samples:\n")
+print(mean.frame)
+```
+
+```{r include=FALSE}
+
+## Predictions
+
+beta_means <- colMeans(beta.post_sample.new)
+# Convert beta_means to a numeric vector if necessary
+beta_means <- as.numeric(beta_means)
+
+# Step 5: Compute the linear predictor using the mean of beta_post.pro
+eta.test <- X.test %*% beta_means  # Linear predictor
+
+# Calculate predicted probabilities using the logistic function for bank_test
+pi.star.test <- exp(eta.test) / (1 + exp(eta.test))
+
+predicted_classes <- ifelse(pi.star.test > 0.3, 1, 0)
+```
+
+Once fitted both models on the training data-set, observe above the estimated parameter linked to the different independent variables. 
+
+When using the scale() function in regression analysis, the data is standardized at mean equal to 0 and standard deviation to 1. This transformation affects the interpretation of the parameters of both numeric and binary categorical variables. For example 'loan' and 'housing' as binary, refer to the change in the intercept when corresponding variable are affirmative (note that the model suggest a negative effect to the intercept, and so the probability of deposit, for both predictors).
+
+## Predictive Performance Comparison of Approaches
+
+Test data-set are used as unseen observations to make predictions from the two models to have a basis for a comparison. Tool like confusion matrix and related measures, inform as about the performance of a model for prediction.
+
+```{r echo=FALSE, warning=FALSE}
+library(pROC)
+
+# Confusion matrix
+confusion_matrix = table(Predicted = predicted_classes_freq, Actual = test$y)
+print(confusion_matrix)
+
+# Accuracy
+accuracy = sum(diag(confusion_matrix)) / sum(confusion_matrix)
+
+# Precision
+precision <- confusion_matrix[2, 2] / sum(confusion_matrix[2, ])
+
+# Recall
+recall <- confusion_matrix[2, 2] / sum(confusion_matrix[, 2])
+
+# F1 Score
+f1_score <- 2 * (precision * recall) / (precision + recall)
+
+cat("\n")
+cat(sprintf("Accuracy: %.2f\n", round(accuracy, 2)))
+cat(sprintf("Precision: %.2f\n", round(precision, 2)))
+cat(sprintf("Recall: %.2f\n", round(recall, 2)))
+cat(sprintf("F1-Score: %.2f\n", round(f1_score, 2)))
+
+# ROC Curve 
+roc_curve = roc(test$y, test_predictions)
+auc_value = auc(roc_curve) 
+plot(roc_curve, main = "ROC Curve for Frequentis Model", col = "green4") 
+
+
+########################
+### Bayesian Metrics ###
+########################
+
+# Confusion matrix
+confusion_matrix_bayes <- table(Predicted = predicted_classes, Actual = factor(test$y))
+print(confusion_matrix_bayes)
+
+# Accuracy
+accuracy_bayes = sum(diag(confusion_matrix)) / sum(confusion_matrix)
+
+# Precision
+precision_bayes <- confusion_matrix_bayes[2, 2] / sum(confusion_matrix_bayes[2, ])
+
+# Recall
+recall_bayes <- confusion_matrix_bayes[2, 2] / sum(confusion_matrix_bayes[, 2])
+
+# F1 Score
+f1_score_bayes <- 2 * (precision_bayes * recall_bayes) / (precision_bayes + recall_bayes)
+
+cat("\n")
+cat(sprintf("Accuracy: %.2f\n", round(accuracy_bayes, 2)))
+cat(sprintf("Precision: %.2f\n", round(precision_bayes, 2)))
+cat(sprintf("Recall: %.2f\n", round(recall_bayes, 2)))
+cat(sprintf("F1-Score: %.2f\n", round(f1_score_bayes, 2)))
+
+# ROC Curve 
+roc_curve_bayes <- roc(test$y, pi.star.test)
+auc_value_bayes <- auc(roc_curve_bayes)
+
+# Plot ROC curve
+plot(roc_curve_bayes, main = "ROC Curve for Bayesian Model", col = "green4")
+```
+
+Due to unbalanced data, the model has difficulties to predict the minority class.
+
+When a non-informative priors in Bayesian framework has been choosed, the resulting confusion matrix and performance metrics of the model reflect only information coming from the data, like in the frequentist model. This similarity often arises when both methodologies are applied to the same data-set, but keep in mind when data is highly imbalanced or exhibits complex interactions, the models may diverge in their predictions.
+
+> Precisation:
+>
+> -   the posterior distribution of the random variable for the parameters $\beta_i$ is derived using Maximum Likelihood Estimation (MLE) like the Frequentist framework, but with a critical distinction: it models parameters as probability distributions rather than fixed values.
+
+This new posterior distribution of the parameters, can serve as prior information for next experiments, as it incorporates information obtained from trained model (Before-After-Control-Impact design techniques could be implemented). Bayesian inference offers a more flexible framework for statistical modeling when prior knowledge or information from previous experiments is available. This probabilistic treatment facilitates a deeper understanding of parameter uncertainty.
+
+# Quantifying and Evaluating Uncertainty of Parameter Estimation
+
+In statistical inference, the ***frequentist approach*** is used to quantify and evaluate uncertainty around parameter estimates with two regression analysis tools: ***hypothesis testing*** witch provide a formal decision on whether the predictor is statistically significant, and ***confidence intervals*** that quantify the uncertainty in terms of precision/magnitude around the estimated coefficients, offering a range of plausible values for the true fixed and unknown population parameters.
+
+```{r echo=FALSE}
+cat('Confidence Interval \n')
+cat('\n')
+round(confint.default(glm_model), 3)
+```
+
+This result can already give some insight:
+
+> -   `housingyes` (witch is a dummy variable encoded from `housing` representing if the contacted person has already signed a house loan) is between `(-0.925, -0.529)` within a 95% confidence interval, that can be interpretative as negative effect on the **interceprt** for the linear component linked to the probability to subscribe a deposit when the other variable are fixed at their mean value.
+> -   `previous` CI are `(0.112, 0.199)` indicate a positive association with number of previous and the probability of subscription, keeping all other variable constant and at their baseline level.
+
+```{r echo=FALSE}
+library(ggplot2)
+
+conf_intervals = confint.default(glm_model)
+conf_intervals
+
+results <- data.frame(
+  Coefficient = rownames(conf_intervals),
+  Estimate = coef(glm_model),
+  Lower = conf_intervals[, 1],
+  Upper = conf_intervals[, 2]
+)
+
+# print(results)
+
+ggplot(results, aes(x = Coefficient, y = Estimate)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  theme_minimal() +
+  labs(title = "Confidence Intervals for GLM (Frequentist) Coefficients",
+       x = "Coefficient",
+       y = "Estimate (with 95% CI)")
+```
+
+With CI we can infer that statistically, if the same campaign were repeated many time, after computing the estimate and the confidence interval, 95% of those intervals contain the true unknown parameter on the long-run, so no information about the parameter uncertainty is given as it's considered a fixed value.
+
+```{r echo=FALSE}
+credible_interval = mean.frame
+
+
+results_bayes <- data.frame(
+  Coefficient = rownames(conf_intervals),  # Ensure rownames match the credible_interval
+  Estimate = credible_interval$Mean,      # Correct column access
+  Lower = credible_interval$`Q2.5`,       # Correct column name
+  Upper = credible_interval$`Q97.5`       # Correct column name
+)
+
+
+ggplot(results_bayes, aes(x = Coefficient, y = Estimate)) +
+  geom_point(size = 3) +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  theme_minimal() +
+  labs(title = "Credible Intervals for GLM (Bayesian) Coefficients",
+       x = "Coefficient",
+       y = "Estimate (with 95% CRI)")
+```
+
+```{r echo=FALSE}
+cat('Credible Interval \n')
+cat('\n')
+cat(sprintf("%-12s %6s %6s\n", "", "2.5 %", "97.5 %"))  # Print header
+for (i in 1:nrow(mean.frame)) {
+  cat(sprintf(
+    "%-12s %6.2f %6.2f\n",
+    rownames(mean.frame)[i],
+    mean.frame$Q2.5[i],
+    mean.frame$Q97.5[i]
+  ))
+}
+```
+
+From a ***Bayesian perspective,*** parameters are represented as random variables. Thus parameters $\beta=[\beta_0,...,\beta_4]^T$ are random variable $\beta_i \sim p(\beta_i)$ with probability functions prior information, combined with the data, $p(y|\beta )$ likelihood function of our data.
+
+With the Bayes theorem we get:
+
+$$
+p(\beta_i) \propto p(data|\beta_i) p(\beta_i)
+$$
+
+Now posterior density function of the different parameters can be sampled or obtained from the MCMC and the Metropolis-Hastings Algorithm, so we can directly compute and visualize the distribution of all parameters of the regression. *Credible intervals* (CRI) rely on the inference on those posterior distributions, i.e. identifying the 95% region intervals (conceptually similar to CI) but with the relevant and important difference that CRI can be interpreted implying a quantification of the uncertainty around $\beta_i$.
+
+The logistic regression model can be expressed as: $$
+P(\hat Y = 1 | X) = \frac{1}{1 + e^{-(\beta_0 + \beta_1 X_1 + \beta_2 X_2 + \ldots + \beta_k X_k)}}
+$$ where $( \beta_0, \beta_1, \ldots, \beta_k )$ are the coefficients estimated.
+
+> -   `housingyes` for the bayesian approach we can assert that the true parameter for the change in intercept, linked to the probability to subscribe the deposit $p(Y=1)$, with 95% probability lies in the CRI.
+
+> -   `previous` 95% of the times the true parameter lies between (0.23, 0.24) meaning there is a high probable positive effect to probability of subscription, when increasing previous calls and all others variable are considered at their mean value.
+
+The figure below is a visualization of the posterior distribution of the parameter with its CRI. 
+
+```{r echo=FALSE, warning=FALSE}
+# Extract the fifth column for plotting
+data_column <- beta.post_sample.new[, 5]
+
+# Calculate the 95% credible interval (CRI)
+quantiles_95 <- quantile(data_column, probs = c(0.025, 0.975))
+
+# Load ggplot2 library
+library(ggplot2)
+
+# Create the histogram with enhanced visualization
+ggplot(data.frame(data_column = data_column), aes(x = data_column)) +
+  # Highlight the area between the 2.5th and 97.5th percentiles
+  geom_rect(
+    aes(xmin = quantiles_95[1], xmax = quantiles_95[2], ymin = 0, ymax = Inf),
+    fill = "grey", alpha = 0.85              # Shading color and transparency
+  ) +
+  geom_histogram(
+    bins = 50,                               # Number of bins
+    fill = "red2",                           # Red color for bars
+    color = "grey",                          # Grey borders for bars
+    alpha = 0.65                             # Slight transparency
+  ) +
+  # Add vertical lines for the 2.5th and 97.5th percentiles
+  geom_vline(xintercept = quantiles_95[1], color = "black", linetype = "dashed", size = 0.57) + 
+  geom_vline(xintercept = quantiles_95[2], color = "black", linetype = "dashed", size = 0.57) +
+  # Add labels and a title
+  labs(
+    title = "Posterior Distribution and 95% CRI of 'previous'", # Title of the plot
+    x = "Values",                                               # X-axis label
+    y = "Density"                                               # Y-axis label
+  ) +
+  scale_x_continuous(
+    breaks = scales::breaks_pretty(n = 5)                       # Reduce x-axis ticks for clarity
+  ) +
+  theme_minimal(base_size = 14)                                 # Use minimal theme with adjusted font size
+
+```
+
+# Conclusion
+
+This project implemented and compared two statistical paradigms, Frequentist and Bayesian, in the context of predicting client subscription decisions for a direct marketing campaign. Below are the key takeaways and conclusions from the analysis:
+
+### Frequentist approach
+
+Confidence intervals and hypothesis testing offered tools for assessing the reliability and precision of estimates,
+
+> Limitations: Confidence intervals rely on repeated sampling and do not quantify the probability of the true parameter lying within a single interval.
+
+### Bayesian approach
+
+> Strengths : Bayesian inference quantify parameter uncertainty in terms of probabilities and allow the incorporation of prior knowledge. The posterior distributions of parameters also provide a foundation for iterative modeling, where prior knowledge from past experiments can inform future analyses.
+
+> Limitations: The computational cost of Bayesian modeling, particularly with custom MCMC algorithms, is significantly higher than frequentist approaches. - Model performance was not markedly superior to the frequentist model in this case, given the simplicity of the data-set and the absence of strong prior information.
+
+Performance of the model implemented are bad, the use of other model or further implementation in the case is required. The philosophical differences between the Frequentist and Bayesian paradigms reflect broader debates about the nature of knowledge and inference, because thinking to unknown parameters of a population as fixed ... The decision to choose one approach over the other often depends on the specific context of the analysis and its complexity.  
