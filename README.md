@@ -16,7 +16,7 @@ The aim is to provide an in-depth understanding of the differences in philosophy
 ## 📊 Dataset
 [Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) has been used, in particular 'bank.csv' file instead of 'bank_full.csv' for computational reasons.
 
-## 📈 Results
+## 💡 Results
 
 Using the *Covariance Matrix* to eliminate correleted varaibles and *Bayesian Feature Selection using Latent Variables* to identify the most influential predictors, the model is fitted on a subset that consider: 
 
