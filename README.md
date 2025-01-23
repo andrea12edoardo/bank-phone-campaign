@@ -46,3 +46,7 @@ Regression coefficients are point estimates representing the relationship betwee
 - In this framework, the parameter is considered a random variable with a probability distribution that reflects its uncertainty.
 - The Bayesian interpretation is inherently more intuitive, as it provides a direct probabilistic statement about the parameter's uncertainty.
 - This interpretation relies solely on the given experiment and does not require assumptions about repeating it.
+
+| Frequentist | Bayesian |
+|---------|---------|
+| ![Image 1](images/confidence.png) | ![Image 2](images/credible.png) |
