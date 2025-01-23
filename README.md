@@ -14,11 +14,11 @@ The aim is to provide an in-depth understanding of the differences in philosophy
 
 
 ## 📊 Dataset
-[Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) has been used, in particular 'bank.csv' file insted of 'bank_full.csv' for computational reasons.
+[Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) has been used, in particular 'bank.csv' file instead of 'bank_full.csv' for computational reasons.
 
 ## 📈 Results
 
-Using the *Covariance Matrix* to eliminate correleated varaibles and *Bayesian Feature Selection using Latent Variables* to to identify the most influential predictors, the model is fitted on a subset that consider: 
+Using the *Covariance Matrix* to eliminate correleted varaibles and *Bayesian Feature Selection using Latent Variables* to identify the most influential predictors, the model is fitted on a subset that consider: 
 
  - `housing | Yes`
  - `loan | Yes`
@@ -29,6 +29,20 @@ Using the *Covariance Matrix* to eliminate correleated varaibles and *Bayesian F
 |---------|---------|
 | ![Image 1](images/covariance.png) | ![Image 2](images/selection.png) |
 
-The model is then fitted to the data using both approaches to obtain the estimates. However data suffers from an issue of unbalanced labels, thus from a predictive perspective, the model result in poor performance concerning the minority class, which is the information of primary interest. This problem could be solved with more advanced techniques.
+Similar estimation of the parameters was obtained for both approaches. However, the data suffers from an issue of unbalanced labels; thus, from a predictive perspective, the model results in poor performance concerning the minority class, which is the information of primary interest.
 
-# 💡 Conclusion
+Regression coefficients are point estimates representing the relationship between independent and dependent variables. They indicate how changes in the independent variables are associated with changes in the dependent variable. However, the interpretation of these coefficients from a statistical standpoint differs between Frequentist and Bayesian perspectives:
+
+***Frequentist interpretation***:
+> *If the experiment were repeated many times, in the long run, 100(1-⍺)% of the calculated intervals would contain the true but fixed parameter.*
+
+- This approach assumes the possibility of infinitely repeating the experiment under identical conditions.
+- The frequentist confidence interval provides information only about the reliability of the interval and **not** about the uncertainty of the parameter itself.
+- The parameter is treated as a fixed, unknown constant, and no probabilistic statements can be made directly about it.
+
+***Bayesian interpretation***:
+> *the interval with probability 100(1-⍺)% contain the true parameter considered as a random variable*.
+
+- In this framework, the parameter is considered a random variable with a probability distribution that reflects its uncertainty.
+- The Bayesian interpretation is inherently more intuitive, as it provides a direct probabilistic statement about the parameter's uncertainty.
+- This interpretation relies solely on the given experiment and does not require assumptions about repeating it.
