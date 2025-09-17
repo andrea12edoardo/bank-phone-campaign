@@ -3,8 +3,16 @@
 This repository focuses on data analysis using **Generalized Linear Model (GLM)**, in particular the **Multivariate Logistic Regression** applied to a public dataset from a Portuguese banking institution's marketing campaign, implemented in R.
 The aim is to provide an understanding of the differences in philosophy, methodology, and results between the Frequentist and Bayesian approaches, adhering to proper statistical assumptions to ensure the right interpretation of results.
 
+## Authors
 
-## Pipeline of the Project:
+- *Vittoria Cassola*
+- *Andrea Sciortino*
+
+# Dataset
+[Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) has been used, in particular 'bank.csv' file instead of 'bank_full.csv' for computational reasons.
+
+## Project Structure:
+
 1. **Data Preprocessing**: The dataset undergoes cleaning, feature selection, and transformation to ensure the quality and relevance of the input variables.
 2. **Modeling Approaches**:
    - **Frequentist Approach**: The model estimate parameter with maximum likelihood regression methods.
@@ -12,9 +20,6 @@ The aim is to provide an understanding of the differences in philosophy, methodo
 3. **Model Evaluation**: Both models are evaluated using various performance metrics, including accuracy, precision, recall, F1-score, and AUC-ROC, to assess and compare their predictive performance.
 4. **Interpretation**: Careful interpretation of the model's results is emphasized, ensuring that the conclusions drawn are statistically valid and meaningful.
 
-
-## Dataset
-[Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) has been used, in particular 'bank.csv' file instead of 'bank_full.csv' for computational reasons.
 
 ## 💡 Results
 
