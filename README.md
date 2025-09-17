@@ -21,7 +21,7 @@ The [Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Rep
 4. **Interpretation**: Careful interpretation of the model's results is emphasized, ensuring that the conclusions drawn are statistically valid and meaningful.
 
 
-## 💡 Results
+# 💡 Results
 
 Using the *Covariance Matrix* to eliminate correleted varaibles and *Bayesian Feature Selection using Latent Variables* to identify the most influential predictors, the model is fitted on a subset that consider: 
 
