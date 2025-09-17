@@ -9,7 +9,7 @@ The aim is to provide an understanding of the differences in philosophy, methodo
 - *Andrea Sciortino*
 
 # Dataset
-[Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) has been used, in particular 'bank.csv' file instead of 'bank_full.csv' for computational reasons.
+The [Moro S., Rita P., Cortez P. (2014). Bank Marketing UCI Machine Learning Repository](https://archive.ics.uci.edu/ml/datasets/Bank+Marketing) contains client and campaign features from a Portuguese bank’s direct marketing phone calls, aimed at predicting term deposit subscription decision ('yes' or 'no'). The 'bank.csv' file has been used instead of 'bank_full.csv' for computational reasons.
 
 ## Project Structure:
 
